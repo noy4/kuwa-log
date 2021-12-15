@@ -1,21 +1,15 @@
+import { DocumentReference } from 'firebase/firestore'
+
 export type Doc = {
-  id: string
+  ref: DocumentReference
   createdAt: Date
   updatedAt: Date
 }
 
-export type KLogFormValues = {
+export type KLog = Doc & {
   title: string
+  tags: string[]
 }
-export type TaggedKLogFormValues = KLogFormValues & {
-  tag: string
-}
-export type KLog = Doc &
-  KLogFormValues & {
-    tags: string[]
-  }
-
-export type TagFormValues = {
-  title: string
-}
-export type Tag = Doc & TagFormValues
+export type KLogFormValues = Pick<KLog, 'title'>
+export type Tag = Doc & { title: string }
+export type TagFormValues = Pick<Tag, 'title'>

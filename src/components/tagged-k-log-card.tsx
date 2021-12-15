@@ -1,72 +1,119 @@
-import { KLog, Tag, TaggedKLogFormValues } from '@/@types'
-import { useFirestore, useTaggedKLogs } from '@/hooks'
-import { pick } from '@/lib/pick'
-import { CloseIcon } from '@chakra-ui/icons'
-import { Box, Flex, IconButton, Input, Spacer, Spinner } from '@chakra-ui/react'
+import { KLog, KLogFormValues, Tag } from '@/@types'
+import { kLogsRef, tagsRef, transform } from '@/lib/db'
+import {
+  Box,
+  CloseButton,
+  Flex,
+  Input,
+  Spacer,
+  Spinner,
+  Tag as ChakraTag,
+} from '@chakra-ui/react'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { where } from 'firebase/firestore'
-import { useEffect } from 'react'
+import { addDoc, deleteDoc, orderBy, query, where } from 'firebase/firestore'
+import { useEffect, VFC } from 'react'
+import { useCollectionData } from 'react-firebase-hooks/firestore'
 import { useForm } from 'react-hook-form'
 import { Select } from './select'
 
-export const TaggedKLogCard = () => {
-  const formMethods = useForm<TaggedKLogFormValues>()
-  const { handleSubmit, register, reset, watch } = formMethods
+type Props = {
+  storageKey: string
+}
+export const TaggedKLogCard: VFC<Props> = ({ storageKey }) => {
+  const {
+    register: tagRegister,
+    watch,
+    reset: resetTag,
+  } = useForm<{ tag: string }>({
+    defaultValues: { tag: '' },
+  })
+  const { handleSubmit, register, reset } = useForm<KLogFormValues>()
   const tag = watch('tag')
-  // const { data, isLoading, create, del } = useFirestore<KLog>(
-  //   'kLogs',
-  //   [where('tags', 'array-contains', tag ?? '')],
-  //   [tag]
-  // )
-  const { data, isLoading, create, del } = useTaggedKLogs(tag)
-  const { data: tags } = useFirestore<Tag>('tags')
+
+  const [kLogs = [], loading] = useCollectionData<KLog>(
+    query(
+      kLogsRef,
+      where('tags', 'array-contains', tag),
+      orderBy('updatedAt', 'desc')
+    ) as any,
+    {
+      refField: 'ref',
+      transform,
+    }
+  )
+
+  const [tags = []] = useCollectionData<Tag>(
+    query(tagsRef, orderBy('updatedAt', 'desc')) as any,
+    {
+      refField: 'ref',
+      transform,
+    }
+  )
   const tagOptions = tags.map((t) => ({ value: t.title, text: t.title }))
 
-  const onSubmit = handleSubmit((values) => {
-    console.log('values:', values)
-    create({ ...pick(values, 'title') })
+  const onSubmit = handleSubmit(async (values) => {
+    const dto = {
+      ...values,
+      tags: [tag],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    await addDoc(kLogsRef, dto)
     reset()
   })
 
   useEffect(() => {
-    reset({ tag: tags[0]?.title })
+    const newTag = localStorage[storageKey] || tags[0]?.title || ''
+    resetTag({ tag: newTag })
   }, [tags])
+
+  useEffect(() => {
+    if (!tag) return
+    localStorage.setItem(storageKey, tag)
+  }, [tag])
 
   return (
     <Flex direction='column' h='full'>
       <Flex align='center' mt='8' mb='4'>
-        <Select {...register('tag')} options={tagOptions} w='40' />
+        <Select {...tagRegister('tag')} options={tagOptions} w='40' />
         <Spacer />
-        {isLoading && <Spinner />}
+        {loading && <Spinner />}
       </Flex>
       <form onSubmit={onSubmit}>
         <Input {...register('title')} mb='4' isRequired />
       </form>
       <Box overflowY='auto' flex='1'>
-        {data?.map((d, i) => (
-          <div key={i}>
-            <Flex my='2' py='2' align='end' role='group'>
-              <Box>{d.title}</Box>
-              <Spacer />
-              <Box fontSize='xs' ml='auto'>
-                {formatDistanceToNowStrict(d.updatedAt, {
-                  locale: ja,
-                })}
-              </Box>
-              <IconButton
-                aria-label='削除'
-                display='none'
-                variant='ghost'
-                rounded='full'
-                size='xs'
-                ml='2'
-                _groupHover={{ display: 'block' }}
-                icon={<CloseIcon />}
-                onClick={() => del(d.id)}
-              />
-            </Flex>
-          </div>
+        {kLogs.map((kLog, i) => (
+          <Flex key={i} my='2' py='2' align='center' role='group' wrap='wrap'>
+            <Box>{kLog.title}</Box>
+            <Spacer />
+            {kLog.tags.map((tag, i) => (
+              <ChakraTag
+                key={i}
+                variant='solid'
+                fontSize='xx-small'
+                size='sm'
+                mx='1'
+              >
+                {tag}
+              </ChakraTag>
+            ))}
+            <Box fontSize='xs' ml='auto'>
+              {formatDistanceToNowStrict(kLog.updatedAt, {
+                locale: ja,
+              })}
+            </Box>
+            <CloseButton
+              display='none'
+              rounded='full'
+              w='6'
+              h='6'
+              ml='2'
+              _groupHover={{ display: 'block' }}
+              onClick={() => deleteDoc(kLog.ref)}
+            />
+          </Flex>
         ))}
       </Box>
     </Flex>

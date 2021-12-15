@@ -1,5 +1,5 @@
 import * as firebase from 'firebase/app'
-import { getFirestore } from 'firebase/firestore'
+import { collection, getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,3 +16,14 @@ if (!firebase.getApps().length) {
 }
 
 export const db = getFirestore()
+
+export const transform = (val: any) => {
+  return {
+    ...val,
+    createdAt: val.createdAt.toDate(),
+    updatedAt: val.updatedAt.toDate(),
+  }
+}
+
+export const tagsRef = collection(db, 'tags')
+export const kLogsRef = collection(db, 'kLogs')

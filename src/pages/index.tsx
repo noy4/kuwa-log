@@ -13,7 +13,13 @@ const Home: NextPage = () => {
         <KLogCard />
       </Container>
       <Container maxW='sm' h='50vh'>
-        <TaggedKLogCard />
+        <TaggedKLogCard storageKey='tag1' />
+      </Container>
+      <Container maxW='sm' h='50vh'>
+        <TaggedKLogCard storageKey='tag2' />
+      </Container>
+      <Container maxW='sm' h='50vh'>
+        <TaggedKLogCard storageKey='tag3' />
       </Container>
     </Grid>
   )
