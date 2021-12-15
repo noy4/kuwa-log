@@ -9,23 +9,30 @@ import {
   getDocs,
   orderBy,
   query,
+  where,
 } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { KLogState } from 'state'
 
-export const useKLogs = () => {
+export const useTaggedKLogs = (tag: string) => {
   const [isFetching, setIsFetching] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const isLoading = isFetching || isCreating || isDeleting
-  const { kLogs, setKLogs, addKLog, removeKLog } = KLogState.useContainer()
+  const { kLogTree, setKLogsByKey, addKLog, removeKLog } =
+    KLogState.useContainer()
 
-  const fetchKLogs = async () => {
+  const fetchData = async () => {
+    console.log('11:', 11)
     setIsFetching(true)
-    const q = query(collection(db, 'kLogs'), orderBy('updatedAt', 'desc'))
+    const q = query(
+      collection(db, 'kLogs'),
+      orderBy('updatedAt', 'desc'),
+      where('tags', 'array-contains', tag ?? '')
+    )
     const querySnapshot = await getDocs(q)
 
-    const newKLogs = querySnapshot.docs.map(
+    const newData = querySnapshot.docs.map(
       (d) =>
         ({
           ...d.data(),
@@ -34,31 +41,30 @@ export const useKLogs = () => {
           updatedAt: d.data().updatedAt.toDate(),
         } as KLog)
     )
-    console.log('newKLogs:', newKLogs)
-    setKLogs(newKLogs)
+    setKLogsByKey(tag, newData)
     setIsFetching(false)
   }
 
-  const createKLog = async (values: KLogFormValues) => {
+  const create = async (values: KLogFormValues) => {
     try {
       setIsCreating(true)
       const dto = {
         ...values,
-        tags: [],
+        tags: [tag],
         createdAt: new Date(),
         updatedAt: new Date(),
       }
       const docRef = await addDoc(collection(db, 'kLogs'), dto)
       addKLog({ ...dto, id: docRef.path })
 
-      console.log('Doc: ', await getDoc(doc(db, docRef.path)))
+      console.log('Doc: ', (await getDoc(doc(db, docRef.path))).data())
     } catch (e) {
       console.error('Error adding document: ', e)
     }
     setIsCreating(false)
   }
 
-  const deleteKLog = async (id: string) => {
+  const del = async (id: string) => {
     try {
       setIsDeleting(true)
       await deleteDoc(doc(db, id))
@@ -70,16 +76,16 @@ export const useKLogs = () => {
   }
 
   useEffect(() => {
-    fetchKLogs()
-  }, [])
+    fetchData()
+  }, [tag])
 
   return {
-    kLogs,
+    data: kLogTree[tag],
     isLoading,
     isFetching,
     isCreating,
     isDeleting,
-    createKLog,
-    deleteKLog,
+    create,
+    del,
   }
 }

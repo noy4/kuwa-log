@@ -1,4 +1,4 @@
-import { KLog, KLogFormValues } from '@/@types'
+import { Doc } from '@/@types'
 import { db } from '@/lib/db'
 import {
   addDoc,
@@ -9,60 +9,68 @@ import {
   getDocs,
   orderBy,
   query,
+  QueryConstraint,
 } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
-import { KLogState } from 'state'
 
-export const useKLogs = () => {
+export const useFirestore = <TData extends Doc>(
+  path: string,
+  queryConstraints: QueryConstraint[] = [],
+  dependencies: any[] = []
+) => {
+  type FormValues = Omit<TData, keyof Doc>
+  const [data, setData] = useState<TData[]>([])
   const [isFetching, setIsFetching] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const isLoading = isFetching || isCreating || isDeleting
-  const { kLogs, setKLogs, addKLog, removeKLog } = KLogState.useContainer()
 
-  const fetchKLogs = async () => {
+  const fetchData = async () => {
+    console.log('11:', 11)
     setIsFetching(true)
-    const q = query(collection(db, 'kLogs'), orderBy('updatedAt', 'desc'))
+    const q = query(
+      collection(db, path),
+      orderBy('updatedAt', 'desc'),
+      ...queryConstraints
+    )
     const querySnapshot = await getDocs(q)
 
-    const newKLogs = querySnapshot.docs.map(
+    const newData = querySnapshot.docs.map(
       (d) =>
         ({
           ...d.data(),
           id: d.ref.path,
           createdAt: d.data().createdAt.toDate(),
           updatedAt: d.data().updatedAt.toDate(),
-        } as KLog)
+        } as TData)
     )
-    console.log('newKLogs:', newKLogs)
-    setKLogs(newKLogs)
+    setData(newData)
     setIsFetching(false)
   }
 
-  const createKLog = async (values: KLogFormValues) => {
+  const create = async (values: FormValues) => {
     try {
       setIsCreating(true)
       const dto = {
         ...values,
-        tags: [],
         createdAt: new Date(),
         updatedAt: new Date(),
-      }
-      const docRef = await addDoc(collection(db, 'kLogs'), dto)
-      addKLog({ ...dto, id: docRef.path })
+      } as Omit<TData, 'id'>
+      const docRef = await addDoc(collection(db, path), dto)
+      setData((prev) => [{ ...dto, id: docRef.path } as TData, ...prev])
 
-      console.log('Doc: ', await getDoc(doc(db, docRef.path)))
+      console.log('Doc: ', (await getDoc(doc(db, docRef.path))).data())
     } catch (e) {
       console.error('Error adding document: ', e)
     }
     setIsCreating(false)
   }
 
-  const deleteKLog = async (id: string) => {
+  const del = async (id: string) => {
     try {
       setIsDeleting(true)
       await deleteDoc(doc(db, id))
-      removeKLog(id)
+      setData((prev) => prev.filter((k) => k.id !== id))
     } catch (e) {
       console.error('削除失敗')
     }
@@ -70,16 +78,16 @@ export const useKLogs = () => {
   }
 
   useEffect(() => {
-    fetchKLogs()
-  }, [])
+    fetchData()
+  }, dependencies)
 
   return {
-    kLogs,
+    data,
     isLoading,
     isFetching,
     isCreating,
     isDeleting,
-    createKLog,
-    deleteKLog,
+    create,
+    del,
   }
 }

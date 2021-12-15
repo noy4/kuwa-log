@@ -1,7 +1,21 @@
-export type KLog = {
+export type Doc = {
   id: string
-  title: string
-  date: Date
+  createdAt: Date
+  updatedAt: Date
 }
 
-export type KLogFormValues = Pick<KLog, 'title'>
+export type KLogFormValues = {
+  title: string
+}
+export type TaggedKLogFormValues = KLogFormValues & {
+  tag: string
+}
+export type KLog = Doc &
+  KLogFormValues & {
+    tags: string[]
+  }
+
+export type TagFormValues = {
+  title: string
+}
+export type Tag = Doc & TagFormValues
